@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from transforms3d.euler import mat2euler
-
+from scipy.spatial.transform import Rotation
+from scipy.linalg import expm
 def load_data(file_name):
     '''
     function to read visual features, IMU measurements, and calibration parameters
@@ -219,8 +220,92 @@ def pose2adpose(T):
   calT[...,3:,3:] = T[...,:3,:3]
   return calT
 
+def homegenous_transformation(R, t):
+  T = np.eye(4)
+  T[:3, :3] = R
+  T[:3, 3] = t
+  return T
 
+def hat_map(x):   
+  '''
+  @Input:
+    x = n x 3 = n elements 3d vectors
+  @Output:
+    x_hat = n x 3 x 3 = n elements of skew symmetric matrices
+  '''
+  x_hat = np.zeros((x.shape[0], 3, 3))
+  x_hat[:, 0, 1] = -x[:, 2]
+  x_hat[:, 0, 2] = x[:, 1]
+  x_hat[:, 1, 0] = x[:, 2]
+  x_hat[:, 1, 2] = -x[:, 0]
+  x_hat[:, 2, 0] = -x[:, 1]
+  x_hat[:, 2, 1] = x[:, 0]
+  return x_hat
 
+def generate_hat_map_matrices(w,v):
+  twist_hat = np.zeros((w.shape[0], 4, 4))
+  twist_hat[:, :3, :3] = w
+  twist_hat[:, :3, 3] = v
+  return twist_hat
+
+def transform_pose_matrix_to_xy(pose_matrix,need_theata=False):
+  init_pose = homegenous_transformation(np.eye(3),np.zeros(3))
+  X = []
+  Y = []
+  Theta = []
+  for i in range(len(pose_matrix)):
+      position = pose_matrix[i] @ init_pose 
+      x = position[:3, 3][0]
+      y = position[:3, 3][1]
+      X.append(x)
+      Y.append(y)
+      r = Rotation.from_matrix(position[:3, :3])
+      deg = r.as_euler('zyx', degrees=False)
+      Theta.append(deg[0])
+  if need_theata == True:
+      return X, Y, Theta
+  else:
+      return X, Y
+
+def IMU_localization(linear_velocity,angular_velocity,time):
+  omega_hat = hat_map(angular_velocity.T)
+  zeta_hat = generate_hat_map_matrices(omega_hat,linear_velocity.T)
+  # drop first pose
+  zeta_hat = zeta_hat[1:]
+  T_k = np.eye(4)
+  T_history = []
+  time_reshaped  = time[:, np.newaxis, np.newaxis]
+  exp_map = expm(time_reshaped*zeta_hat) 
+  for i in range(zeta_hat.shape[0]):
+    T_k1 =  T_k @ exp_map[i]
+    # update T_k
+    T_k = T_k1
+    T_history.append(T_k1)
+  return T_history
+
+def visualize_trajectory(pose,dataset,save=False):
+    fig,ax = plt.subplots(figsize=(8,6))
+    x,y = transform_pose_matrix_to_xy(np.array(pose))
+    ax.scatter(x[0],y[0],marker='s',label="start")
+    ax.scatter(x[-1],y[-1],marker='o',label="end")
+    plt.title(f"IMU localization via EKF prediction dataset {dataset}")
+    plt.plot(x,y,label="IMU Localization via EKF Prediction")
+    plt.xlabel('x (m)')
+    plt.ylabel('y (m)')
+    plt.legend()
+    plt.grid()
+    if save == True:
+        plt.savefig(f'results/IMU_localization_via_EKF_prediction_dataset{dataset}.png')
+    plt.show()
+def flip_velocity_and_angular(velocity,angular):
+    # Filp the y and z axis of the velocity and angular
+    velocity[1] = -velocity[1]
+    velocity[2] = -velocity[2]
+    angular[1] = -angular[1]
+    angular[2] = -angular[2]
+    return velocity,angular
+if __name__ == '__main__':
+   print("This is a library of utility functions for pr3.")
 
 
 
