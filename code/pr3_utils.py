@@ -304,6 +304,80 @@ def flip_velocity_and_angular(velocity,angular):
     angular[1] = -angular[1]
     angular[2] = -angular[2]
     return velocity,angular
+
+def homogenous(vectors_3d):
+    '''
+    @Input:
+        vectors_3d = M x n = M elements of n 3d vectors
+    '''
+    return np.vstack((vectors_3d, np.ones((1, vectors_3d.shape[1]))))
+
+def old_landmark_initialization(features,POSE,imu_T_cam,b):
+    # relative transformation from left camera to right camera
+    p = np.array([0,-b,0]).reshape(3,1)
+    e_3 = np.array([0,0,1]).reshape(3,1)
+    R = np.eye(3)
+    o_T_r = np.array([[0,-1,0,0],
+                [0,0,-1,0],
+                [1,0, 0,0],
+                [0,0, 0,1]])
+    o_T_i = o_T_r @ np.linalg.inv(imu_T_cam)
+    x_all = []
+    y_all = []
+    for j in range(1):
+      valid = features[:,:,j][0]!=-1.
+      features_t = features[:,:,j][:,valid]
+      m_all = []
+      # 3 x n
+      z_1 = homogenous(np.stack((features_t[0],features_t[2])))
+      z_2 = homogenous(np.stack((features_t[1],features_t[3])))
+      # 3 x n
+      a = R.T @ p - (e_3.T @ R.T @ p) * z_2
+      b_ = R.T @ z_1 - (e_3.T @ R.T @ z_1) * z_2
+      m_ = homogenous((np.dot(a,a.T)[0][0] / np.dot(a,b_.T)[0][0]) * z_1)
+      m_hat = POSE[j] @ imu_T_cam @ m_
+      x_all.append(m_hat[0,:])
+      y_all.append(m_hat[1,:])
+    return x_all,y_all
+
+def landmark_initialization(features,POSE,imu_T_cam,K_s):
+    # x_all = []
+    # y_all = []
+    # m_all = []
+    observed = np.zeros(features.shape[1])
+    landmark = np.ones((3, features.shape[1])) * -1
+    for i in range(features.shape[2]):
+        features_t = features[:,:,i]
+        # keypoint observation: 1, 2, 3 ...
+        index = np.where(np.min(features_t, axis=0) != -1)
+        # previously unobserved landmark: 2, 3, ...
+        index_unobserved = np.where(observed == 0)
+        index_observed = np.where(observed == 1)
+        unobserved = np.intersect1d(index, index_unobserved)
+        obs = np.intersect1d(index, index_observed)
+        features_t = features_t[:, unobserved]
+        pts = features_t
+        # calculate the disparity between left to the right: uL - uR = 1/z * fx b
+        disparity = pts[0, :] - pts[2, :]
+        fx_b = - K_s[2, -1]
+        # calculate the depth estimation of the 3D points M(2,3)/uL-uR
+        z = fx_b / disparity
+        # since M is uninvertible, we need to solve the equation manually
+        pts_3D = np.ones((4, pts.shape[1]))
+        pts_3D[2, :] = z
+        # x = uL * z / fx, y = uR * z / fy
+        pts_3D[0, :] = (pts[0, :] * z - K_s[0,2] * z) / K_s[0,0]
+        pts_3D[1, :] = (pts[1, :] * z - K_s[1,2] * z) / K_s[1,1]
+        # calculate the [x, y, z, 1] in the optical frame
+        X_r = imu_T_cam @ pts_3D
+        m_w = POSE[i] @ X_r
+        observed[unobserved] = 1
+        landmark[:, unobserved] = m_w[:3, :]/m_w[-1, :]
+        # m_all.append(m_w)
+        # x_all.append(m_w[0,:])
+        # y_all.append(m_w[1,:])
+    return landmark
+
 if __name__ == '__main__':
    print("This is a library of utility functions for pr3.")
 
