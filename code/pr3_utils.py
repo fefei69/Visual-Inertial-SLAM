@@ -361,29 +361,28 @@ def landmark_initialization(features,POSE,imu_T_cam,K_s):
     landmark = np.ones((3, features.shape[1])) * -1
     for i in range(features.shape[2]):
         features_t = features[:,:,i]
-        # keypoint observation: 1, 2, 3 ...
+        # index of useful features
         index = np.where(np.min(features_t, axis=0) != -1)
-        # previously unobserved landmark: 2, 3, ...
+        # index of previous unobserved landmark 
         index_unobserved = np.where(observed == 0)
         index_observed = np.where(observed == 1)
         unobserved = np.intersect1d(index, index_unobserved)
         obs = np.intersect1d(index, index_observed)
         features_t = features_t[:, unobserved]
-        pts = features_t
+        z_t = features_t
         # calculate the disparity between left to the right: uL - uR = 1/z * fx b
-        disparity = pts[0, :] - pts[2, :]
-        fx_b = - K_s[2, -1]
-        # calculate the depth estimation of the 3D points M(2,3)/uL-uR
-        z = fx_b / disparity
-        # since M is uninvertible, we need to solve the equation manually
-        pts_3D = np.ones((4, pts.shape[1]))
-        pts_3D[2, :] = z
-        # x = uL * z / fx, y = uR * z / fy
-        pts_3D[0, :] = (pts[0, :] * z - K_s[0,2] * z) / K_s[0,0]
-        pts_3D[1, :] = (pts[1, :] * z - K_s[1,2] * z) / K_s[1,1]
-        # calculate the [x, y, z, 1] in the optical frame
-        X_r = imu_T_cam @ pts_3D
-        m_w = POSE[i] @ X_r
+        disparity = z_t[0, :] - z_t[2, :]
+        fu_b = - K_s[2, -1]
+        # calculate the depth estimation of the 3D points z = fxb/uL-uR
+        z = fu_b / disparity
+        zt_ = np.ones((4, z_t.shape[1]))
+        zt_[2, :] = z
+        # x = uL * z / fx | y = uR * z / fy
+        zt_[0, :] = (z_t[0, :] * z - K_s[0,2] * z) / K_s[0,0]
+        zt_[1, :] = (z_t[1, :] * z - K_s[1,2] * z) / K_s[1,1]
+        # Z in camera frame
+        z_r = imu_T_cam @ zt_
+        m_w = POSE[i] @ z_r
         observed[unobserved] = 1
         landmark[:, unobserved] = m_w[:3, :]/m_w[-1, :]
         # m_all.append(m_w)
