@@ -297,6 +297,19 @@ def visualize_trajectory(pose,dataset,save=False):
     if save == True:
         plt.savefig(f'results/IMU_localization_via_EKF_prediction_dataset{dataset}.png')
     plt.show()
+def visualize_landmark_mapping(lm, x, y,dataset,save=False):
+    fig,ax = plt.subplots(figsize=(8,6))
+    ax.scatter(x[0],y[0],marker='s',label="start")
+    ax.scatter(x[-1],y[-1],marker='o',label="end")
+    plt.title("Landmark Mapping initial guess")
+    plt.plot(x, y, color='lime', label="robot trajectory",linewidth=2)
+    plt.plot(lm[0,:],lm[1,:],'.k',markersize=1,label="landmarks")
+    plt.xlabel('x (m)')
+    plt.ylabel('y (m)')
+    plt.legend()
+    if save == True:
+      plt.savefig(f"results/landmark_initialization_{dataset}.png")
+    plt.show()
 def flip_velocity_and_angular(velocity,angular):
     # Filp the y and z axis of the velocity and angular
     velocity[1] = -velocity[1]
@@ -378,6 +391,19 @@ def landmark_initialization(features,POSE,imu_T_cam,K_s):
         # y_all.append(m_w[1,:])
     return landmark
 
+def EKF_predicition_covariance(zeta,time):
+    zeta_ad = axangle2adtwist(zeta)
+    # drop first pose
+    zeta_ad = zeta_ad[1:]
+    cov_t = np.diag([1e-3, 1e-3, 1e-3, 1e-4, 1e-4, 1e-4])
+    Covariance = [cov_t]
+    W = 1e-3
+    for i in range(zeta_ad.shape[0]):
+      cov_t1 = expm(-time[i]*zeta_ad[i]) @ cov_t @ expm(-time[i]*zeta_ad[i]).T + W
+      # update cov_t
+      cov_t = cov_t1
+      Covariance.append(cov_t1)
+    return Covariance
 if __name__ == '__main__':
    print("This is a library of utility functions for pr3.")
 
