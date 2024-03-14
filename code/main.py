@@ -8,7 +8,7 @@ if __name__ == '__main__':
 	dataset = "10"
 	filename = f"../data/{dataset}.npz"
 	t, features, linear_velocity, angular_velocity, K, b, imu_T_cam = load_data(filename)
-	Visualize_Landmark_Mapping = False
+	Visualize_Landmark_Mapping = True
 	# compute tau
 	time = t[0][1:] - t[0][0:-1]
 	# IMU Localization via EKF Prediction
@@ -19,8 +19,8 @@ if __name__ == '__main__':
 	# Extrinsics
 	K_S = np.block([[K[:2, :], np.array([[0, 0]]).T], [K[:2, :], np.array([[-K[0, 0] * b, 0]]).T]])
 	# visualize_trajectory(POSE,dataset=dataset,save=False)
-	FLIP = False
-	if FLIP == True:
+	FLIP_IMU = False
+	if FLIP_IMU == True:
 		linear_velocity, angular_velocity = flip_velocity_and_angular(linear_velocity, angular_velocity)
 	# (a) IMU Localization via EKF Prediction
 	# (6,n) -> (n,6)
