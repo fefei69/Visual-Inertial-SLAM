@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from transforms3d.euler import mat2euler
 from scipy.spatial.transform import Rotation
 from scipy.linalg import expm
+import pdb
 def load_data(file_name):
     '''
     function to read visual features, IMU measurements, and calibration parameters
@@ -356,7 +357,8 @@ def old_landmark_initialization(features,POSE,imu_T_cam,b):
 def landmark_initialization(features,POSE,imu_T_cam,K_s):
     # x_all = []
     # y_all = []
-    # m_all = []
+    obs_features = []
+    m_all = []
     observed = np.zeros(features.shape[1])
     landmark = np.ones((3, features.shape[1])) * -1
     for i in range(features.shape[2]):
@@ -368,8 +370,8 @@ def landmark_initialization(features,POSE,imu_T_cam,K_s):
         index_observed = np.where(observed == 1)
         unobserved = np.intersect1d(index, index_unobserved)
         obs = np.intersect1d(index, index_observed)
-        features_t = features_t[:, unobserved]
-        z_t = features_t
+        z_t = features_t[:, unobserved]
+        obs_features.append(features_t[:, obs])
         # calculate the disparity between left to the right: uL - uR = 1/z * fx b
         disparity = z_t[0, :] - z_t[2, :]
         fu_b = - K_s[2, -1]
@@ -385,10 +387,10 @@ def landmark_initialization(features,POSE,imu_T_cam,K_s):
         m_w = POSE[i] @ z_r
         observed[unobserved] = 1
         landmark[:, unobserved] = m_w[:3, :]/m_w[-1, :]
-        # m_all.append(m_w)
+        m_all.append(m_w[:3, :]/m_w[-1, :])
         # x_all.append(m_w[0,:])
         # y_all.append(m_w[1,:])
-    return landmark
+    return landmark, m_all, obs_features
 
 def EKF_predicition_covariance(zeta,time):
     zeta_ad = axangle2adtwist(zeta)
@@ -403,6 +405,14 @@ def EKF_predicition_covariance(zeta,time):
       cov_t = cov_t1
       Covariance.append(cov_t1)
     return Covariance
+
+def generate_T_imu2o(imu_T_cam):
+    o_T_r = np.array([[0,-1,0,0],
+                [0,0,-1,0],
+                [1,0, 0,0],
+                [0,0, 0,1]])
+    o_T_i = o_T_r @ np.linalg.inv(imu_T_cam)
+    return o_T_i
 if __name__ == '__main__':
    print("This is a library of utility functions for pr3.")
 
