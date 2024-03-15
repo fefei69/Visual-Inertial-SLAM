@@ -8,7 +8,7 @@ if __name__ == '__main__':
 	dataset = "10"
 	filename = f"../data/{dataset}.npz"
 	t, features, linear_velocity, angular_velocity, K, b, imu_T_cam = load_data(filename)
-	Visualize_Landmark_Mapping = True
+	Visualize_Landmark_Mapping = False
 	# compute tau
 	time = t[0][1:] - t[0][0:-1]
 	# IMU Localization via EKF Prediction
@@ -34,7 +34,9 @@ if __name__ == '__main__':
 
 	# EKF update  	
 	observed = np.zeros(features.shape[1])
-	for i in range(features.shape[2] - 1):
+	# covariance 3M x 3M
+	covariance = np.eye(features.shape[1] * 3) * 0.1
+	for i in tqdm(range(features.shape[2] - 1)):
 		# index of useful features
 		index = np.where(np.min(features[:,:,i], axis=0) != -1)
 		# index of previous unobserved landmark 
@@ -58,7 +60,15 @@ if __name__ == '__main__':
 				inovation = obs_z - z_est
 			except ValueError:
 				print("Value Error")
-				pdb.set_trace()
+			o_T_w = o_T_i @ np.linalg.inv(POSE[i+1])
+			H = compute_H(K_S,o_T_w,mean)
+			K_gain = compute_kalman_gain(covariance,H)
+			I = np.eye(len(obs))
+			# update mean
+			lm[:,obs] = mean + K_gain @ inovation
+			# update covariance
+			covariance = (I - K_gain @ H) @ covariance
+
 		# update observed landmarks indices
 		observed[unobserved] = 1
 		# pdb.set_trace()

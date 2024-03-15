@@ -421,9 +421,21 @@ def compute_H(K_s,o_T_w,mean):
     M = N
     P = np.block([[np.eye(3), np.zeros((3, 1))]])
     H = np.zeros((4*N, 3*M))
+    pdb.set_trace()
     H_block = K_s @ projectionJacobian(o_T_w @ mean) @ o_T_w @ P.T
     for i in range(N):
         H[4*i:4*i+4, 3*i:3*i+3] = H_block
+    return H
+def compute_kalman_gain(sigma, H):
+    measurement_noise = 1 ** 2
+    # try pinv if singular
+    K = sigma @ H.T @ np.linalg.inv(H @ sigma @ H.T + measurement_noise)
+    return K
+def compute_new_covariance(sigma, K, H):
+    I = np.eye(sigma.shape[0])
+    new_sigma = (I - K @ H) @ sigma
+    return new_sigma
+   
 if __name__ == '__main__':
    print("This is a library of utility functions for pr3.")
 
