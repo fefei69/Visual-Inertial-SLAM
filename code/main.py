@@ -54,7 +54,8 @@ if __name__ == '__main__':
 				print("Index Error")
 				pdb.set_trace()
 			try:
-				diff = obs_z - z_est
+				# z - z_est
+				inovation = obs_z - z_est
 			except ValueError:
 				print("Value Error")
 				pdb.set_trace()

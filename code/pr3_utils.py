@@ -87,6 +87,7 @@ def projection(ph):
   
 def projectionJacobian(ph):
   '''
+  This is dpi/dq(q)
   ph = n x 4 = homogeneous point coordinates
   J = n x 4 x 4 = Jacobian of ph/ph[...,2]
   '''  
@@ -413,6 +414,16 @@ def generate_T_imu2o(imu_T_cam):
                 [0,0, 0,1]])
     o_T_i = o_T_r @ np.linalg.inv(imu_T_cam)
     return o_T_i
+
+def compute_H(K_s,o_T_w,mean):
+    # in part b assuming N = M
+    N = mean.shape[0]
+    M = N
+    P = np.block([[np.eye(3), np.zeros((3, 1))]])
+    H = np.zeros((4*N, 3*M))
+    H_block = K_s @ projectionJacobian(o_T_w @ mean) @ o_T_w @ P.T
+    for i in range(N):
+        H[4*i:4*i+4, 3*i:3*i+3] = H_block
 if __name__ == '__main__':
    print("This is a library of utility functions for pr3.")
 
