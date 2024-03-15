@@ -45,34 +45,39 @@ if __name__ == '__main__':
 		unobserved = np.intersect1d(index, index_unobserved)
 		obs = np.intersect1d(index, index_observed)
 		ind = np.union1d(obs, np.setdiff1d(index_observed,obs)[-100:])
-		mean = m_bar[i]
 		# new observation
 		if len(obs) > 0:
+			cov_mask = np.concatenate([obs * 3, obs * 3 + 1, obs * 3 + 2])
+			cov_mask_x, cov_mask_y = np.meshgrid(cov_mask, cov_mask, sparse=False, indexing='xy')
+			cov = covariance[cov_mask_x, cov_mask_y]	
 			obs_z = features[:,:,i+1][:,obs]
-			try:
-				z_o = o_T_i @ np.linalg.inv(POSE[i+1]) @ homogenous(lm[:,obs])
-				z_est = K_S @ (z_o/z_o[2,:])
-			except IndexError:
-				print("Index Error")
-				pdb.set_trace()
-			try:
-				# z - z_est
-				inovation = obs_z - z_est
-			except ValueError:
-				print("Value Error")
+			mean = lm[:,obs]
+			z_o = o_T_i @ np.linalg.inv(POSE[i+1]) @ homogenous(lm[:,obs])
+			z_est = K_S @ (z_o/z_o[2,:])
+			# z - z_est
+			inovation = obs_z - z_est
+			# T from world to optical frame
 			o_T_w = o_T_i @ np.linalg.inv(POSE[i+1])
-			H = compute_H(K_S,o_T_w,mean)
-			K_gain = compute_kalman_gain(covariance,H)
-			I = np.eye(len(obs))
-			# update mean
-			lm[:,obs] = mean + K_gain @ inovation
-			# update covariance
-			covariance = (I - K_gain @ H) @ covariance
+			# H: 4N x 3M (now 4N x 3N)
+			H = compute_H(K_S,o_T_w,homogenous(mean))
+			# kalman gain 3M x 4N (now 3N x 4N)
+			K_gain = compute_kalman_gain(cov,H)
+			I = np.eye(len(obs) * 3)
+			# update mean, mean : 3Mx1
+			mean = mean.T.reshape(-1,1) + K_gain @ inovation.T.reshape(-1,1)
+			# update landmarks, convert mean back (need to follow the order of the reshape originally) 
+			lm[:,obs] = mean.reshape(-1, 3).T
+			# pdb.set_trace()
+			# update covariance, K_gain @ H : 3M x 3M
+			cov = (I - K_gain @ H) @ cov
+			covariance[cov_mask_x, cov_mask_y] = cov
 
 		# update observed landmarks indices
 		observed[unobserved] = 1
 		# pdb.set_trace()
-
+	x, y = transform_pose_matrix_to_xy(np.array(POSE))
+	# np.save(f"results/{dataset}_landmarks.npy",lm)
+	visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=True)
 
 
 

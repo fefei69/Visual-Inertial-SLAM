@@ -299,7 +299,12 @@ def visualize_trajectory(pose,dataset,save=False):
     if save == True:
         plt.savefig(f'results/IMU_localization_via_EKF_prediction_dataset{dataset}.png')
     plt.show()
-def visualize_landmark_mapping(lm, x, y,dataset,save=False):
+def visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=False):
+    if outlier_rejection == True:
+        x_mask = (lm[0, :] > -1500) & (lm[0, :] < 500)
+        y_mask = (lm[1, :] > -1000) & (lm[1, :] < 500)
+        mask = x_mask & y_mask
+        lm = lm[:,mask]
     fig,ax = plt.subplots(figsize=(8,6))
     ax.scatter(x[0],y[0],marker='s',label="start")
     ax.scatter(x[-1],y[-1],marker='o',label="end")
@@ -417,20 +422,21 @@ def generate_T_imu2o(imu_T_cam):
 
 def compute_H(K_s,o_T_w,mean):
     # in part b assuming N = M
-    N = mean.shape[0]
+    N = mean.shape[1]
     M = N
     P = np.block([[np.eye(3), np.zeros((3, 1))]])
     H = np.zeros((4*N, 3*M))
-    pdb.set_trace()
-    H_block = K_s @ projectionJacobian(o_T_w @ mean) @ o_T_w @ P.T
+    # H_block = K_s @ projectionJacobian((o_T_w @ mean).T).T @ o_T_w @ P.T
     for i in range(N):
-        H[4*i:4*i+4, 3*i:3*i+3] = H_block
+        H[4*i:4*i+4, 3*i:3*i+3] = K_s @ projectionJacobian((o_T_w @ mean[:,i]).reshape(1,-1)) @ o_T_w @ P.T
     return H
+
 def compute_kalman_gain(sigma, H):
     measurement_noise = 1 ** 2
     # try pinv if singular
-    K = sigma @ H.T @ np.linalg.inv(H @ sigma @ H.T + measurement_noise)
+    K = sigma @ H.T @ np.linalg.pinv(H @ sigma @ H.T + measurement_noise)
     return K
+
 def compute_new_covariance(sigma, K, H):
     I = np.eye(sigma.shape[0])
     new_sigma = (I - K @ H) @ sigma
