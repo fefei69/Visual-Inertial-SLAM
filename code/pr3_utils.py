@@ -301,21 +301,25 @@ def visualize_trajectory(pose,dataset,save=False):
     plt.show()
 def visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=False):
     if outlier_rejection == True:
-        x_mask = (lm[0, :] > -1500) & (lm[0, :] < 500)
-        y_mask = (lm[1, :] > -1000) & (lm[1, :] < 500)
-        mask = x_mask & y_mask
-        lm = lm[:,mask]
+      if dataset == "10":
+          x_mask = (lm[0, :] > -1500) & (lm[0, :] < 500)
+          y_mask = (lm[1, :] > -1000) & (lm[1, :] < 500)
+      elif dataset == "03":
+          x_mask = (lm[0, :] > -1100) & (lm[0, :] < 500)
+          y_mask = (lm[1, :] > -300) & (lm[1, :] < 700)
+      mask = x_mask & y_mask
+      lm = lm[:, mask]
     fig,ax = plt.subplots(figsize=(8,6))
     ax.scatter(x[0],y[0],marker='s',label="start")
     ax.scatter(x[-1],y[-1],marker='o',label="end")
-    plt.title("Landmark Mapping initial guess")
+    plt.title("Landmark Mapping with EKF Update")
+    plt.plot(lm[0,:],lm[1,:],'.k',markersize=1,label="Updated landmarks")
     plt.plot(x, y, color='lime', label="robot trajectory",linewidth=2)
-    plt.plot(lm[0,:],lm[1,:],'.k',markersize=1,label="landmarks")
     plt.xlabel('x (m)')
     plt.ylabel('y (m)')
     plt.legend()
     if save == True:
-      plt.savefig(f"results/landmark_initialization_{dataset}.png")
+      plt.savefig(f"results/landmark_EKF_{dataset}.png")
     plt.show()
 def flip_velocity_and_angular(velocity,angular):
     # Filp the y and z axis of the velocity and angular
