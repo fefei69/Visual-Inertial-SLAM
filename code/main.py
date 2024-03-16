@@ -5,7 +5,7 @@ from tqdm import tqdm
 if __name__ == '__main__':
 
 	# Load the measurements
-	dataset = "10"
+	dataset = "03"
 	filename = f"../data/{dataset}.npz"
 	t, features, linear_velocity, angular_velocity, K, b, imu_T_cam = load_data(filename)
 	Visualize_Landmark_Mapping = True
@@ -27,7 +27,7 @@ if __name__ == '__main__':
 	zeta = np.concatenate((linear_velocity, angular_velocity), axis=0).T
 	# prediction covariance
 	pred_cov = EKF_predicition_covariance(zeta, time)
-	lm, m_bar, observed_features = landmark_initialization(features,POSE,imu_T_cam,K_S)
+	lm, m_bar, observed_features = landmark_initialization(features,POSE,imu_T_cam,K_S,dataset,outlier_rejection=False)
 	if Visualize_Landmark_Mapping == True:
 		x, y = transform_pose_matrix_to_xy(np.array(POSE))
 		visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=False)
@@ -35,7 +35,7 @@ if __name__ == '__main__':
 	# EKF update  	
 	observed = np.zeros(features.shape[1])
 	# covariance 3M x 3M
-	cov_sigma = 1
+	cov_sigma = 1.5
 	covariance = np.eye(features.shape[1] * 3) * cov_sigma
 	landmark_test = np.ones((3, features.shape[1])) * -1
 	# covariance = np.eye(1000 * 3) * 0.1
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 			# update mean, mean : 3Mx1
 			mean = mean.T.reshape(-1,1) + K_gain @ inovation.T.reshape(-1,1)
 			# update landmarks, convert mean back (need to follow the order of the reshape originally) 
-			landmark_test[:,obs] = mean.reshape(-1, 3).T
+			lm[:,obs] = mean.reshape(-1, 3).T
 			# pdb.set_trace()
 			# update covariance, K_gain @ H : 3M x 3M
 			cov = (I - K_gain @ H) @ cov
@@ -80,7 +80,7 @@ if __name__ == '__main__':
 		# pdb.set_trace()
 	x, y = transform_pose_matrix_to_xy(np.array(POSE))
 	# np.save(f"results/{dataset}_landmarks_m_noise{cov_sigma}.npy",lm)
-	visualize_landmark_mapping(landmark_test, x, y,dataset,save=True,outlier_rejection=True)
+	visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=True)
 
 
 

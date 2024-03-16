@@ -364,7 +364,7 @@ def old_landmark_initialization(features,POSE,imu_T_cam,b):
       y_all.append(m_hat[1,:])
     return x_all,y_all
 
-def landmark_initialization(features,POSE,imu_T_cam,K_s):
+def landmark_initialization(features,POSE,imu_T_cam,K_s,dataset,outlier_rejection=False):
     # x_all = []
     # y_all = []
     obs_features = []
@@ -400,6 +400,16 @@ def landmark_initialization(features,POSE,imu_T_cam,K_s):
         m_all.append(m_w[:3, :]/m_w[-1, :])
         # x_all.append(m_w[0,:])
         # y_all.append(m_w[1,:])
+
+    if outlier_rejection == True:
+      if dataset == "10":
+          x_mask = (landmark[0, :] > -1500) & (landmark[0, :] < 500)
+          y_mask = (landmark[1, :] > -1000) & (landmark[1, :] < 500)
+      elif dataset == "03":
+          x_mask = (landmark[0, :] > -1100) & (landmark[0, :] < 500)
+          y_mask = (landmark[1, :] > -300) & (landmark[1, :] < 700)
+      mask = x_mask & y_mask
+      landmark = landmark[:, mask]
     return landmark, m_all, obs_features
 
 def EKF_predicition_covariance(zeta,time):
