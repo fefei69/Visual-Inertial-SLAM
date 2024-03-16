@@ -319,7 +319,8 @@ def visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=Fal
     plt.ylabel('y (m)')
     plt.legend()
     if save == True:
-      plt.savefig(f"results/landmark_EKF_{dataset}.png")
+      plt.savefig(f"test_noise/landmark_EKF_{dataset}_noise_V1e-4_cov13-3.png")
+      # plt.savefig(f"results/landmark_EKF_{dataset}.png")
     plt.show()
 def flip_velocity_and_angular(velocity,angular):
     # Filp the y and z axis of the velocity and angular
@@ -446,7 +447,7 @@ def compute_H(K_s,o_T_w,mean):
     return H
 
 def compute_kalman_gain(sigma, H):
-    measurement_noise = 1 ** 2
+    measurement_noise = 1e-4 * np.eye(H.shape[0])
     # try pinv if singular
     K = sigma @ H.T @ np.linalg.pinv(H @ sigma @ H.T + measurement_noise)
     return K
