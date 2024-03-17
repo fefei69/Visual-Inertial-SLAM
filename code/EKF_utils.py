@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.linalg import expm
-from pr3_utils import hat_map, generate_hat_map_matrices, transform_pose_matrix_to_xy, axangle2adtwist, projectionJacobian
+from pr3_utils import *
 from scipy.sparse import csr_matrix, lil_matrix
 from tqdm import tqdm
 import pdb
@@ -292,7 +292,6 @@ def Visual_SLAM(features, linear_velocity, angular_velocity, time, K_s, imu_T_ca
         unobserved = np.intersect1d(index, index_unobserved)
         obs = np.intersect1d(index, index_observed)
         ind = np.union1d(obs, np.setdiff1d(index_observed,obs)[-100:])
-        N, M = obs.shape[1], len(ind)
         # initialize landmarks
         z_t = features_t[:, unobserved]
         # calculate the disparity between left to the right: uL - uR = 1/z * fx b
@@ -311,6 +310,7 @@ def Visual_SLAM(features, linear_velocity, angular_velocity, time, K_s, imu_T_ca
         landmark[:, unobserved] = m_w[:3, :]/m_w[-1, :]
         observed[unobserved] = 1
         if len(obs) > 0:
+            N, M = len(obs), len(ind)
             mean = landmark[:,obs]
             obs_z = features[:,:,i+1][:,obs]
             cov_mask = np.concatenate([obs * 3, obs * 3 + 1, obs * 3 + 2])
@@ -322,9 +322,15 @@ def Visual_SLAM(features, linear_velocity, angular_velocity, time, K_s, imu_T_ca
             inovation = obs_z - z_est
             # T from world to optical frame
             o_T_w = o_T_i @ np.linalg.inv(pose) 
-            # H 4 N x 3 M + 6
+            # H: 4 N x (3 M + 6)
             H = np.zeros((4 * N, 3 * M + 6))
+            P = np.block([[np.eye(3), np.zeros((3, 1))]])
+            s_ = np.ones((1, 4))
+            o_dot(s_)
             pdb.set_trace()
+            for i in range(N):
+                H[4*i:4*i+4, 3*i:3*i+3] = K_s @ projectionJacobian((o_T_w @ mean[:,i]).reshape(1,-1)) @ o_T_w @ P.T
+            
 
     # N, M = obs.shape[1], len(index)
     

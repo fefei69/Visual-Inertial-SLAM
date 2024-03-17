@@ -10,7 +10,7 @@ if __name__ == '__main__':
 	dataset = "03"
 	filename = f"../data/{dataset}.npz"
 	t, features, linear_velocity, angular_velocity, K, b, imu_T_cam = load_data(filename)
-	Visualize_Landmark_Mapping = True
+	Visualize_Landmark_Mapping = False
 	# compute tau
 	time = t[0][1:] - t[0][0:-1]
 	# IMU Localization via EKF Prediction

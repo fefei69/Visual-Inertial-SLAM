@@ -228,7 +228,7 @@ def homegenous_transformation(R, t):
 
 def hat_map(x):   
   '''
-  @Input:
+  @Input:s
     x = n x 3 = n elements 3d vectors
   @Output:
     x_hat = n x 3 x 3 = n elements of skew symmetric matrices
@@ -241,6 +241,19 @@ def hat_map(x):
   x_hat[:, 2, 0] = -x[:, 1]
   x_hat[:, 2, 1] = x[:, 0]
   return x_hat
+
+def o_dot(s):
+  '''
+  @Input:
+      s = n x 4
+  @Output:
+      s_dot = n x 4 x 6
+  '''
+  # n x 4 x 6
+  s_dot = np.zeros((s.shape[0], 4, 6))
+  s_dot[:, :3, 3:] = -hat_map(s[:, :3])
+  s_dot[:, :3, :3] = np.eye(3)
+  return s_dot
 
 def generate_hat_map_matrices(w,v):
   twist_hat = np.zeros((w.shape[0], 4, 4))
