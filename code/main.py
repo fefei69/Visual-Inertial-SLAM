@@ -31,13 +31,16 @@ if __name__ == '__main__':
 		pred_cov = EKF_predicition_covariance(zeta, time)
 		lm, m_bar, observed_features = landmark_initialization(features,POSE,imu_T_cam,K_S,dataset,outlier_rejection=False)
 		x, y = transform_pose_matrix_to_xy(np.array(POSE))
-		visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=False)
+		# visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=False)
 		# EKF update
 		landmark_test = EKF_update(features,lm,POSE,o_T_i,K_S)
 		# np.save(f"results/{dataset}_landmarks_m_noise{cov_sigma}.npy",lm)
-		visualize_landmark_mapping(landmark_test, x, y,dataset,save=True,outlier_rejection=True)
+		visualize_landmark_mapping(landmark_test, x, y,dataset,save=False,outlier_rejection=True)
 	else:
-		Visual_SLAM(features, linear_velocity, linear_velocity, time, K_S,imu_T_cam)
+		slam_poses, landmarks = Visual_SLAM(features, linear_velocity, linear_velocity, time, K_S,imu_T_cam)
+		x, y = transform_pose_matrix_to_xy(np.array(slam_poses))
+		visualize_landmark_mapping(landmarks, x, y,dataset,save=False,outlier_rejection=False)
+
 
 
 
