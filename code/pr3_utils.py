@@ -279,7 +279,28 @@ def transform_pose_matrix_to_xy(pose_matrix,need_theata=False):
       return X, Y, Theta
   else:
       return X, Y
- 
+  
+def SO3_skew(w):
+    """
+    :param: a shape of 3 x 1
+    :return: 3 x 3 skew symmetric matrix
+    """
+    x, y, z = w[0], w[1], w[2]
+    A = np.array([[0, -z, y],[z, 0, -x], [-y, x, 0]])
+    return A
+
+def SE3_skew(v):
+    """
+    hat map of special euclidean group
+    :param: [rho, theta], 6x1 
+    :return: transformation T, 4x4
+    """
+    rho, theta = v[:3], v[3:]
+    T = np.zeros((4,4))
+    T[:3, :3] = SO3_skew(theta)
+    T[:3, -1] = rho
+    return T 
+
 if __name__ == '__main__':
    print("This is a library of utility functions for pr3.")
 

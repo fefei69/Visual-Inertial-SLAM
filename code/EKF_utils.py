@@ -58,8 +58,8 @@ def visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=Fal
     plt.ylabel('y (m)')
     plt.legend()
     if save == True:
-      plt.savefig(f"test_noise/landmark_EKF_{dataset}_noise_V1e-4_cov13-3.png")
-      # plt.savefig(f"results/landmark_EKF_{dataset}.png")
+    #   plt.savefig(f"test_noise/landmark_EKF_{dataset}_noise_V1e-4_cov13-3.png")
+      plt.savefig(f"results/SLAM_EKF_{dataset}.png")
     plt.show()
 
 def flip_velocity_and_angular(velocity,angular):
@@ -76,34 +76,6 @@ def homogenous(vectors_3d):
         vectors_3d = M x n = M elements of n 3d vectors
     '''
     return np.vstack((vectors_3d, np.ones((1, vectors_3d.shape[1]))))
-
-def old_landmark_initialization(features,POSE,imu_T_cam,b):
-    # relative transformation from left camera to right camera
-    p = np.array([0,-b,0]).reshape(3,1)
-    e_3 = np.array([0,0,1]).reshape(3,1)
-    R = np.eye(3)
-    o_T_r = np.array([[0,-1,0,0],
-                [0,0,-1,0],
-                [1,0, 0,0],
-                [0,0, 0,1]])
-    o_T_i = o_T_r @ np.linalg.inv(imu_T_cam)
-    x_all = []
-    y_all = []
-    for j in range(1):
-      valid = features[:,:,j][0]!=-1.
-      features_t = features[:,:,j][:,valid]
-      m_all = []
-      # 3 x n
-      z_1 = homogenous(np.stack((features_t[0],features_t[2])))
-      z_2 = homogenous(np.stack((features_t[1],features_t[3])))
-      # 3 x n
-      a = R.T @ p - (e_3.T @ R.T @ p) * z_2
-      b_ = R.T @ z_1 - (e_3.T @ R.T @ z_1) * z_2
-      m_ = homogenous((np.dot(a,a.T)[0][0] / np.dot(a,b_.T)[0][0]) * z_1)
-      m_hat = POSE[j] @ imu_T_cam @ m_
-      x_all.append(m_hat[0,:])
-      y_all.append(m_hat[1,:])
-    return x_all,y_all
 
 def landmark_initialization(features,POSE,imu_T_cam,K_s,dataset,outlier_rejection=False):
     # x_all = []
@@ -130,7 +102,7 @@ def landmark_initialization(features,POSE,imu_T_cam,K_s,dataset,outlier_rejectio
         z = fu_b / disparity
         zt_ = np.ones((4, z_t.shape[1]))
         zt_[2, :] = z
-        # x = uL * z / fx | y = uR * z / fy
+        # x = uL * z / fx,  y = uR * z / fy
         zt_[0, :] = (z_t[0, :] * z - K_s[0,2] * z) / K_s[0,0]
         zt_[1, :] = (z_t[1, :] * z - K_s[1,2] * z) / K_s[1,1]
         # Z in camera frame
@@ -202,7 +174,7 @@ def EKF_update(features,lm,POSE,o_T_i,K_S):
 	observed = np.zeros(features.shape[1])
 	# covariance 3M x 3M
 	cov_sigma = 1e-3
-	covariance = lil_matrix(np.eye(features.shape[1] * 3) * cov_sigma)
+	covariance = np.eye(features.shape[1] * 3) * cov_sigma
 	landmark_test = np.ones((3, features.shape[1])) * -1
 	# covariance = np.eye(1000 * 3) * 0.1
 	for i in tqdm(range(features.shape[2] - 1)):
@@ -225,7 +197,7 @@ def EKF_update(features,lm,POSE,o_T_i,K_S):
 			# z - z_est
 			inovation = obs_z - z_est
 			# T from world to optical frame
-			o_T_w = o_T_i @ np.linalg.inv(POSE[i+1]) 
+			o_T_w = o_T_i @ inversePose(POSE[i+1]) 
 			# H: 4N x 3M (now 4N x 3N)
 			H = compute_H(K_S,o_T_w,homogenous(mean))
 			# kalman gain 3M x 4N (now 3N x 4N)
@@ -235,7 +207,8 @@ def EKF_update(features,lm,POSE,o_T_i,K_S):
 			mean = mean.T.reshape(-1,1) + K_gain @ inovation.T.reshape(-1,1)
 			# update landmarks, convert mean back (need to follow the order of the reshape originally) 
 			lm[:,obs] = mean.reshape(-1, 3).T
-			print("updated landmarks",np.max(abs(K_gain @ inovation.T.reshape(-1,1))))
+			# print("updated landmarks",np.max(abs(K_gain @ inovation.T.reshape(-1,1))))
+            # update covariance, K_gain @ H : 3M x 3M
 			# update covariance, K_gain @ H : 3M x 3M
 			cov = (I - K_gain @ H) @ cov
 			covariance[cov_mask_x, cov_mask_y] = cov
@@ -292,21 +265,23 @@ def Visual_SLAM(features, linear_velocity, angular_velocity, time, K_s, imu_T_ca
     '''
     # set initial pose to be identity
     pose = np.eye(4)
-    o_T_i = generate_T_imu2o(imu_T_cam)
+    # o_T_i = generate_T_imu2o(imu_T_cam)
+    o_T_i = np.linalg.inv(imu_T_cam)
     observed = np.zeros(features.shape[1])
     landmark = np.ones((3, features.shape[1])) * -1
     # covariance 3M x 3M
     cov_sigma = 1e-3
     pose_cov = np.diag([1e-3, 1e-3, 1e-3, 1e-4, 1e-4, 1e-4])
     covariance_lm = (np.eye(features.shape[1] * 3) * cov_sigma)
+    lm_pose_correlation = np.zeros((features.shape[1] * 3, 6))
+    index_six = np.array([0,1,2,3,4,5])
     updated_pose_history = []
     for i in tqdm(range(features.shape[2]-1)):
         # EKF Prediction
         # print("updated pose",np.max(abs(pose)))
-        pose, pose_cov = EKF_predict(linear_velocity[:,i].reshape(-1,1),angular_velocity[:,i].reshape(-1,1),time[i],pose, pose_cov)
+        pose, pose_cov = EKF_predict(linear_velocity[:,i].reshape(-1,1),angular_velocity[:,i].reshape(-1,1),time[i], pose, pose_cov)
         # print("predicted pose",np.max(abs(pose)))
         # pdb.set_trace()
-        
         features_t = features[:,:,i]
         # index of useful features
         index = np.where(np.min(features_t, axis=0) != -1)
@@ -318,21 +293,27 @@ def Visual_SLAM(features, linear_velocity, angular_velocity, time, K_s, imu_T_ca
         ind = np.union1d(obs, np.setdiff1d(index_observed,obs)[-100:])
         # landmark initial guess
         try:
-            landmark[:, unobserved] = lm_init(features_t,unobserved,pose,imu_T_cam,K_s)
+            landmark[:, unobserved] = lm_init(features_t, unobserved, pose, imu_T_cam, K_s)
         except ValueError:
             print("ValueError in landmark initialization")
             pdb.set_trace()
         if len(obs) > 0:
             N, M = len(obs), len(ind)
             mean = landmark[:,ind]
-            obs_z = features[:,:,i+1][:,obs]
+            obs_z = features[:,:,i][:,obs]
+            # 3M x 3M
             cov_mask = np.concatenate([ind * 3, ind * 3 + 1, ind * 3 + 2])
             cov_mask_x, cov_mask_y = np.meshgrid(cov_mask, cov_mask, sparse=False, indexing='xy')
             cov_lm = covariance_lm[cov_mask_x, cov_mask_y]
+            # 6 x 3M
+            corr_mask = np.concatenate([ind * 3, ind * 3 + 1, ind * 3 + 2])
+            corr_mask_x, corr_mask_y = np.meshgrid(corr_mask, index_six, sparse=False, indexing='xy')
+            cov_lm_pose_correlation = lm_pose_correlation[corr_mask_x, corr_mask_y].T
             z_o = o_T_i @ inversePose(pose) @ homogenous(landmark[:,obs])
             z_est = K_s @ (z_o/z_o[2,:])
             # z - z_est
             inovation = obs_z - z_est
+            # inovation = (obs_z.T.reshape(-1, 1) - z_est.T.reshape(-1, 1)).flatten()
             # T from world to optical frame inversePose
             o_T_w = o_T_i @ inversePose(pose) 
             # o_T_w = o_T_i @ np.linalg.inv(pose) 
@@ -342,28 +323,38 @@ def Visual_SLAM(features, linear_velocity, angular_velocity, time, K_s, imu_T_ca
             mean_h = homogenous(landmark[:,obs])
             for j in range(N):
                 k = np.where(ind == obs[j])[0][0]
-                H[4*j:4*j+4, 3*k:3*k+3] = K_s @ projectionJacobian((o_T_w @ mean_h[:,j]).reshape(1,-1)) @ o_T_w @ P.T
-                H[4*j:4*j+4, -6:] = - K_s @ projectionJacobian((o_T_w @ mean_h[:,j]).reshape(1,-1)) @ o_T_i @ o_dot((inversePose(pose) @ mean_h[:,j]).reshape(1,-1))
+                H[4*j:4*j+4, 3*k:3*k+3] = (K_s @ projectionJacobian((o_T_w @ mean_h[:,j]).reshape(1,-1)) @ o_T_w @ P.T)[0]
+                H[4*j:4*j+4, -6:] = -(K_s @ projectionJacobian((o_T_w @ mean_h[:,j]).reshape(1,-1)) @ o_T_i @ o_dot((inversePose(pose) @ mean_h[:,j]).reshape(1,-1)))[0]
+            # pdb.set_trace()
             cov_lm_pose = np.zeros((3 * M + 6, 3 * M + 6)) 
+            cov_lm_pose[:-6, -6:] = cov_lm_pose_correlation
+            cov_lm_pose[-6:, :-6] = cov_lm_pose_correlation.T
             cov_lm_pose[-6:, -6:] = pose_cov
             cov_lm_pose[:-6, :-6] = cov_lm
             try:
-                K_GAIN = cov_lm_pose @ H.T @ np.linalg.pinv(H @ cov_lm_pose @ H.T + 5 * np.eye(H.shape[0]))
+                K_GAIN = cov_lm_pose @ H.T @ np.linalg.inv(H @ cov_lm_pose @ H.T + 1 * np.eye(H.shape[0])) #50
             except np.linalg.LinAlgError: 
                 print("LinAlgError")
                 pdb.set_trace()
             # update pose
-            pose = pose @ expm(axangle2twist((K_GAIN[-6:, :] @ inovation.T.reshape(-1,1)).T))[0]
+            # pdb.set_trace()
+            pose = pose @ expm(SE3_skew((K_GAIN[-6:, :] @ inovation.T.reshape(-1,1)).flatten()))
             # pdb.set_trace()
             updated_pose_history.append(pose)
+            # update covariance jointly
+            joint_cov = (np.eye(3 * M + 6) - K_GAIN @ H) @ cov_lm_pose
+            pose_cov = joint_cov[-6:, -6:]
+            cov_lm = joint_cov[:-6, :-6]
+            cov_lm_pose_correlation = joint_cov[:-6, -6:]
             # update pose covariance
-            pose_cov = (np.eye(6) - K_GAIN[-6:, :] @ H[:, -6:]) @ pose_cov
+            # pose_cov = (np.eye(6) - K_GAIN[-6:, :] @ H[:, -6:]) @ pose_cov
             # update landmarks, mean = 3M x 1
             mean = mean.T.reshape(-1,1) + K_GAIN[:-6, :] @ inovation.T.reshape(-1,1)
             landmark[:,ind] = mean.reshape(-1, 3).T
             # update landmarks covariance
-            cov_lm = (np.eye(3 * M) - K_GAIN[:-6,:] @ H[:, :-6]) @ cov_lm
+            # cov_lm = (np.eye(3 * M) - K_GAIN[:-6,:] @ H[:, :-6]) @ cov_lm
             covariance_lm[cov_mask_x, cov_mask_y] = cov_lm
+            lm_pose_correlation[corr_mask_x, corr_mask_y] = cov_lm_pose_correlation.T
         observed[unobserved] = 1
 
     return updated_pose_history, landmark
