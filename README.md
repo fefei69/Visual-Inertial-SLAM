@@ -2,15 +2,11 @@
 ```
 cd code
 ```
-To test IMU localization set Visualize_Localization = True
+Visual landmarks mapping 
 ```
-python main.py
+python main.py --Landmark_Mapping 
 ```
-To test visual landmarks mapping set Visualize_Localization = False, Visualize_Landmark_Mapping = True
+EKF Visual SLAM 
 ```
-python main.py
-```
-To test EKF SLAM set Visualize_Localization = False, Visualize_Landmark_Mapping = False
-```
-python main.py
+python main.py 
 ```

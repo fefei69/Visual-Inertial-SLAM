@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 from transforms3d.euler import mat2euler
 from scipy.spatial.transform import Rotation
 from scipy.linalg import expm
-import pdb
+
+
 def load_data(file_name):
     '''
     function to read visual features, IMU measurements, and calibration parameters

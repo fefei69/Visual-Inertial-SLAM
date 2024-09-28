@@ -110,7 +110,7 @@ def landmark_initialization(features,POSE,imu_T_cam,K_s,dataset,outlier_rejectio
         m_w = POSE[i] @ z_r
         observed[unobserved] = 1
         landmark[:, unobserved] = m_w[:3, :]/m_w[-1, :]
-        print("landmark",np.max(abs(landmark)))
+        # print("landmark",np.max(abs(landmark)))
         m_all.append(m_w[:3, :]/m_w[-1, :])
         # x_all.append(m_w[0,:])
         # y_all.append(m_w[1,:])
