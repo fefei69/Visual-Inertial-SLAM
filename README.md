@@ -38,10 +38,4 @@ python main.py
   <img src="images/visual_slam_data10.png" alt="Caption 8" width="45%">
 </div>
 
-*Caption 7 (left)* | *Caption 8 (right)*
 
----
-
-### Overall Caption
-
-**Overall caption for the figure grid**
