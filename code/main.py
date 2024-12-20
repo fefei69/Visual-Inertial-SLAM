@@ -17,10 +17,13 @@ if __name__ == '__main__':
 	FLIP_IMU = args.FLIP_IMU
 	Visualize_Landmark_Mapping = args.Landmark_Mapping
 
-	import pdb; pdb.set_trace()
 	# compute tau
 	time = t[0][1:] - t[0][0:-1]
 	o_T_i = generate_T_imu2o(imu_T_cam)
+	# imu_T_cam[[1,1,2,2],[0,3,1,3]] = -imu_T_cam[[1,1,2,2],[0,3,1,3]]
+	# o_T_i = np.linalg.inv(imu_T_cam)
+
+	# import pdb; pdb.set_trace()
 	# Extrinsics
 	K_S = np.block([[K[:2, :], np.array([[0, 0]]).T], 
 				    [K[:2, :], np.array([[-K[0, 0] * b, 0]]).T]])
@@ -32,24 +35,48 @@ if __name__ == '__main__':
 	# add identity pose to the beginning 
 	POSE.insert(0,np.eye(4))
 	# visualize localization
-	visualize_trajectory(POSE,dataset=args.dataset,save=False)
+	visualize_trajectory(POSE, dataset=args.dataset, save=False)
 	# IMU Localization via EKF Prediction
 	zeta = np.concatenate((linear_velocity, angular_velocity), axis=0).T
 	# EKF
 	if Visualize_Landmark_Mapping == True:
 		# covariance prediction 
 		pred_cov = EKF_predicition_covariance(zeta, time)
-		lm, m_bar, observed_features = landmark_initialization(features,POSE,imu_T_cam,K_S,args.dataset,outlier_rejection=False)
+		# landmark intial guess
+		lm, m_bar, observed_features = landmark_initialization(features,
+														       POSE,
+															   imu_T_cam,
+															   K_S,
+															   args.dataset,
+															   outlier_rejection=False)
 		x, y = transform_pose_matrix_to_xy(np.array(POSE))
-		visualize_landmark_mapping(lm, x, y,args.dataset,save=False,outlier_rejection=False)
+		visualize_mapping_traj(lm, 
+						       x, 
+							   y, 
+							   args.dataset,
+							   save=False, 
+							   outlier_rejection=False,
+							   title_name='Landmark Mapping Initial Guess')
 		# EKF update
 		landmark_test = EKF_update(features, lm, POSE, o_T_i, K_S)
 		# np.save(f"results/{dataset}_landmarks_m_noise{cov_sigma}.npy",lm)
-		visualize_landmark_mapping(landmark_test, x, y,args.dataset,save=False,outlier_rejection=True)
+		visualize_mapping_traj(landmark_test, 
+						 	   x, 
+							   y,
+							   args.dataset,
+							   save=False,
+							   outlier_rejection=True, 
+							   title_name='Landmark Mapping with EKF Update')
 	else:
-		slam_poses, landmarks = Visual_SLAM(features, linear_velocity, linear_velocity, time, K_S, imu_T_cam)
+		slam_poses, landmarks = Visual_SLAM(features, linear_velocity, angular_velocity, time, K_S, imu_T_cam)
 		x, y = transform_pose_matrix_to_xy(np.array(slam_poses))
-		visualize_landmark_mapping(landmarks, x, y,args.dataset,save=True,outlier_rejection=True)
+		visualize_mapping_traj(landmarks, 
+						       x, 
+							   y, 
+							   args.dataset,
+							   save=True, 
+							   outlier_rejection=True, 
+							   title_name='Visual-Inertial SLAM with EKF')
 
 
 

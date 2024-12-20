@@ -38,7 +38,7 @@ def visualize_trajectory(pose,dataset,save=False):
     if save == True:
         plt.savefig(f'results/IMU_localization_via_EKF_prediction_dataset{dataset}.png')
     plt.show()
-def visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=False):
+def visualize_mapping_traj(lm, x, y, dataset, save=False, outlier_rejection=False, title_name=None):
     if outlier_rejection == True:
       if dataset == "10":
           x_mask = (lm[0, :] > -1500) & (lm[0, :] < 500)
@@ -48,10 +48,10 @@ def visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=Fal
           y_mask = (lm[1, :] > -300) & (lm[1, :] < 700)
       mask = x_mask & y_mask
       lm = lm[:, mask]
-    fig,ax = plt.subplots(figsize=(8,6))
+    fig, ax = plt.subplots(figsize=(8,6))
     ax.scatter(x[0],y[0],marker='s',label="start")
     ax.scatter(x[-1],y[-1],marker='o',label="end")
-    plt.title("Landmark Mapping with EKF Update")
+    plt.title(f"{title_name} dataset {dataset}")
     plt.plot(lm[0,:],lm[1,:],'.k',markersize=1,label="Updated landmarks")
     plt.plot(x, y, color='lime', label="robot trajectory",linewidth=2)
     plt.xlabel('x (m)')
@@ -59,7 +59,7 @@ def visualize_landmark_mapping(lm, x, y,dataset,save=False,outlier_rejection=Fal
     plt.legend()
     if save == True:
     #   plt.savefig(f"test_noise/landmark_EKF_{dataset}_noise_V1e-4_cov13-3.png")
-      plt.savefig(f"results/SLAM_EKF_{dataset}.png")
+      plt.savefig(f"{title_name}.png")
     plt.show()
 
 def flip_velocity_and_angular(velocity,angular):
@@ -209,7 +209,6 @@ def EKF_update(features,lm,POSE,o_T_i,K_S):
 			lm[:,obs] = mean.reshape(-1, 3).T
 			# print("updated landmarks",np.max(abs(K_gain @ inovation.T.reshape(-1,1))))
             # update covariance, K_gain @ H : 3M x 3M
-			# update covariance, K_gain @ H : 3M x 3M
 			cov = (I - K_gain @ H) @ cov
 			covariance[cov_mask_x, cov_mask_y] = cov
 
@@ -265,8 +264,9 @@ def Visual_SLAM(features, linear_velocity, angular_velocity, time, K_s, imu_T_ca
     '''
     # set initial pose to be identity
     pose = np.eye(4)
-    # o_T_i = generate_T_imu2o(imu_T_cam)
+    imu_T_cam[[1,1,2,2],[0,3,1,3]] = -imu_T_cam[[1,1,2,2],[0,3,1,3]]
     o_T_i = np.linalg.inv(imu_T_cam)
+    # o_T_i = generate_T_imu2o(imu_T_cam)
     observed = np.zeros(features.shape[1])
     landmark = np.ones((3, features.shape[1])) * -1
     # covariance 3M x 3M
